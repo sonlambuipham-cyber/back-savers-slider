@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Back Savers - Editable Version</title>
+    <style>
+        /* ============================================
+           CÓ THỂ CHỈNH: MÀU SẮC CHÍNH
+           ============================================ */
+        :root {
+            --primary-color: #667eea;      /* Màu chủ đạo - Tím */
+            --secondary-color: #764ba2;    /* Màu phụ - Tím đậm */
+            --accent-color: #f39c12;       /* Màu nhấn - Cam */
+            --success-color: #2ecc71;      /* Màu thành công - Xanh lá */
+            --danger-color: #e74c3c;       /* Màu cảnh báo - Đỏ */
+            --info-color: #3498db;         /* Màu thông tin - Xanh dương */
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 30px;
+            max-width: 900px;
+            width: 100%;
+        }
+        
+        /* CÓ THỂ CHỈNH: Tiêu đề */
+        h1 {
+            color: var(--primary-color);
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 25px;
+            font-size: 14px;
+        }
+        
+        canvas {
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            width: 100%;
+            height: auto;
+            display: block;
+            margin-bottom: 20px;
+        }
+        
+        .controls {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: #d3d3d3;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+        }
+        
+        .value-display {
+            background: var(--primary-color);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            text-align: center;
+            font-size: 20px;
+            margin-top: 10px;
+        }
+        
+        .info-box {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 15px;
+        }
+        
+        .status {
+            text-align: center;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        
+        .status.optimal {
+            background: var(--success-color);
+            color: white;
+        }
+        
+        .status.feasible {
+            background: var(--info-color);
+            color: white;
+        }
+        
+        .status.infeasible {
+            background: var(--danger-color);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- CÓ THỂ CHỈNH: Tiêu đề trang -->
+        <h1>📊 Back Savers Production Problem</h1>
+        <p class="subtitle">Interactive Iso-Profit Line Slider</p>
+        
+        <div class="status" id="status">Drag slider to explore profit levels</div>
+        
+        <canvas id="canvas" width="800" height="600"></canvas>
+        
+        <div class="controls">
+            <!-- CÓ THỂ CHỈNH: Giá trị min, max, value, step -->
+            <label>💰 Profit Level (Z):</label>
+            <input type="range" 
+                   id="profitSlider" 
+                   min="0" 
+                   max="60000" 
+                   value="30000" 
+                   step="200">
+            <div class="value-display" id="profitValue">$30,000</div>
+        </div>
+        
+        <div class="info-box">
+            <div class="info-row">
+                <span>📦 Collegiate (x₁):</span>
+                <span id="x1Value">-</span>
+            </div>
+            <div class="info-row">
+                <span>🎒 Mini (x₂):</span>
+                <span id="x2Value">-</span>
+            </div>
+            <div class="info-row">
+                <span>💵 Current Profit:</span>
+                <span id="currentProfit">$30,000</span>
+            </div>
+            <div class="info-row" style="border-top: 1px solid rgba(255,255,255,0.3); padding-top: 12px; margin-top: 8px;">
+                <span>🎯 Optimal:</span>
+                <span>$55,400 at (1000, 975)</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // CÓ THỂ CHỈNH: THAM SỐ BÀI TOÁN
+        // ============================================
+        const PARAMS = {
+            // Hàm mục tiêu: Z = c1*x1 + c2*x2
+            objectiveCoeff1: 32,    // Hệ số x₁ (Collegiate profit)
+            objectiveCoeff2: 24,    // Hệ số x₂ (Mini profit)
+            
+            // Optimal solution (đã tính sẵn)
+            optimalX1: 1000,
+            optimalX2: 975,
+            optimalZ: 55400,
+            
+            // Canvas scale
+            maxX1: 2000,           // Giá trị max trục x₁
+            maxX2: 2500,           // Giá trị max trục x₂
+            
+            // Constraints (để vẽ đường)
+            // Fabric: 3x₁ + 2x₂ = 5000
+            fabricCoeff1: 3,
+            fabricCoeff2: 2,
+            fabricRHS: 5000,
+            
+            // Labor: 45x₁ + 40x₂ = 84000
+            laborCoeff1: 45,
+            laborCoeff2: 40,
+            laborRHS: 84000,
+            
+            // Demand constraints
+            collegiateMax: 1000,
+            miniMax: 1200,
+            
+            // CÓ THỂ CHỈNH: MÀU SẮC ĐƯỜNG VẼ
+            colors: {
+                fabric: '#e74c3c',      // Đỏ
+                labor: '#3498db',       // Xanh dương
+                collegiate: '#9b59b6',  // Tím
+                mini: '#1abc9c',        // Xanh ngọc
+                isoprofit: '#f39c12',   // Cam
+                optimal: '#2ecc71',     // Xanh lá
+                feasible: 'rgba(102, 126, 234, 0.15)'  // Xanh nhạt
+            }
+        };
+
+        // Setup
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const slider = document.getElementById('profitSlider');
+        const profitDisplay = document.getElementById('profitValue');
+        const x1Display = document.getElementById('x1Value');
+        const x2Display = document.getElementById('x2Value');
+        const currentProfitDisplay = document.getElementById('currentProfit');
+        const statusDisplay = document.getElementById('status');
+
+        const scaleX = canvas.width / PARAMS.maxX1;
+        const scaleY = canvas.height / PARAMS.maxX2;
+        const margin = 50;
+
+        function toScreenX(x) {
+            return margin + x * scaleX;
+        }
+
+        function toScreenY(y) {
+            return canvas.height - margin - y * scaleY;
+        }
+
+        function drawAxes() {
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(margin, margin);
+            ctx.lineTo(margin, canvas.height - margin);
+            ctx.lineTo(canvas.width - margin, canvas.height - margin);
+            ctx.stroke();
+
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 14px Arial';
+            ctx.fillText('X (Collegiate)', canvas.width - 150, canvas.height - 20);
+            ctx.save();
+            ctx.translate(20, canvas.height / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.fillText('Y (Mini)', 0, 0);
+            ctx.restore();
+
+            // Grid lines and labels
+            ctx.font = '11px Arial';
+            ctx.strokeStyle = '#ddd';
+            ctx.lineWidth = 1;
+            
+            for (let i = 500; i <= PARAMS.maxX1; i += 500) {
+                const x = toScreenX(i);
+                ctx.fillText(i, x - 15, canvas.height - margin + 20);
+                ctx.beginPath();
+                ctx.moveTo(x, margin);
+                ctx.lineTo(x, canvas.height - margin);
+                ctx.stroke();
+            }
+            
+            for (let i = 500; i <= PARAMS.maxX2; i += 500) {
+                const y = toScreenY(i);
+                ctx.fillText(i, margin - 35, y + 5);
+                ctx.beginPath();
+                ctx.moveTo(margin, y);
+                ctx.lineTo(canvas.width - margin, y);
+                ctx.stroke();
+            }
+        }
+
+        function drawConstraints() {
+            // Fabric constraint
+            ctx.strokeStyle = PARAMS.colors.fabric;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            const fabricX2_0 = PARAMS.fabricRHS / PARAMS.fabricCoeff2;  // x₁=0
+            const fabricX1_0 = PARAMS.fabricRHS / PARAMS.fabricCoeff1;  // x₂=0
+            ctx.moveTo(toScreenX(0), toScreenY(fabricX2_0));
+            ctx.lineTo(toScreenX(fabricX1_0), toScreenY(0));
+            ctx.stroke();
+
+            // Labor constraint
+            ctx.strokeStyle = PARAMS.colors.labor;
+            ctx.beginPath();
+            const laborX2_0 = PARAMS.laborRHS / PARAMS.laborCoeff2;
+            const laborX1_0 = PARAMS.laborRHS / PARAMS.laborCoeff1;
+            ctx.moveTo(toScreenX(0), toScreenY(laborX2_0));
+            ctx.lineTo(toScreenX(laborX1_0), toScreenY(0));
+            ctx.stroke();
+
+            // Collegiate demand
+            ctx.strokeStyle = PARAMS.colors.collegiate;
+            ctx.beginPath();
+            ctx.moveTo(toScreenX(PARAMS.collegiateMax), toScreenY(0));
+            ctx.lineTo(toScreenX(PARAMS.collegiateMax), toScreenY(PARAMS.maxX2));
+            ctx.stroke();
+
+            // Mini demand
+            ctx.strokeStyle = PARAMS.colors.mini;
+            ctx.beginPath();
+            ctx.moveTo(toScreenX(0), toScreenY(PARAMS.miniMax));
+            ctx.lineTo(toScreenX(PARAMS.maxX1), toScreenY(PARAMS.miniMax));
+            ctx.stroke();
+        }
+
+        function drawFeasibleRegion() {
+            ctx.fillStyle = PARAMS.colors.feasible;
+            ctx.strokeStyle = '#667eea';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(toScreenX(0), toScreenY(0));
+            ctx.lineTo(toScreenX(PARAMS.optimalX1), toScreenY(0));
+            ctx.lineTo(toScreenX(PARAMS.optimalX1), toScreenY(PARAMS.optimalX2));
+            ctx.lineTo(toScreenX(800), toScreenY(1200));
+            ctx.lineTo(toScreenX(0), toScreenY(1200));
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        function drawOptimalPoint() {
+            ctx.fillStyle = PARAMS.colors.optimal;
+            ctx.beginPath();
+            ctx.arc(toScreenX(PARAMS.optimalX1), toScreenY(PARAMS.optimalX2), 8, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 12px Arial';
+            ctx.fillText('B (Optimal)', toScreenX(PARAMS.optimalX1) + 12, toScreenY(PARAMS.optimalX2) - 10);
+        }
+
+        function drawIsoProfitLine(Z) {
+            if (Z === 0) return;
+
+            const x2AtX1_0 = Z / PARAMS.objectiveCoeff2;
+            const x1AtX2_0 = Z / PARAMS.objectiveCoeff1;
+
+            ctx.strokeStyle = PARAMS.colors.isoprofit;
+            ctx.lineWidth = 4;
+            ctx.setLineDash([10, 5]);
+            ctx.beginPath();
+            
+            if (x2AtX1_0 <= PARAMS.maxX2) {
+                ctx.moveTo(toScreenX(0), toScreenY(x2AtX1_0));
+            } else {
+                const x1Start = (Z - PARAMS.maxX2 * PARAMS.objectiveCoeff2) / PARAMS.objectiveCoeff1;
+                ctx.moveTo(toScreenX(x1Start), toScreenY(PARAMS.maxX2));
+            }
+            
+            if (x1AtX2_0 <= PARAMS.maxX1) {
+                ctx.lineTo(toScreenX(x1AtX2_0), toScreenY(0));
+            } else {
+                const x2End = (Z - PARAMS.maxX1 * PARAMS.objectiveCoeff1) / PARAMS.objectiveCoeff2;
+                ctx.lineTo(toScreenX(PARAMS.maxX1), toScreenY(x2End));
+            }
+            
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Label
+            ctx.fillStyle = PARAMS.colors.isoprofit;
+            ctx.font = 'bold 14px Arial';
+            const labelX = Math.min(x1AtX2_0, PARAMS.maxX1 - 300);
+            ctx.fillText(`Z = $${Z.toLocaleString()}`, toScreenX(labelX), toScreenY(100));
+        }
+
+        function checkFeasibility(Z) {
+            if (Z <= PARAMS.optimalZ) {
+                if (Z === PARAMS.optimalZ) {
+                    statusDisplay.className = 'status optimal';
+                    statusDisplay.textContent = '🎯 OPTIMAL! Maximum profit achieved';
+                    x1Display.textContent = `${PARAMS.optimalX1} units`;
+                    x2Display.textContent = `${PARAMS.optimalX2} units`;
+                } else {
+                    statusDisplay.className = 'status feasible';
+                    statusDisplay.textContent = '✅ Feasible - Can increase profit';
+                    x1Display.textContent = 'Various solutions';
+                    x2Display.textContent = 'Various solutions';
+                }
+            } else {
+                statusDisplay.className = 'status infeasible';
+                statusDisplay.textContent = '❌ INFEASIBLE - Exceeds capacity';
+                x1Display.textContent = 'N/A';
+                x2Display.textContent = 'N/A';
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            drawAxes();
+            drawFeasibleRegion();
+            drawConstraints();
+            drawOptimalPoint();
+            
+            const Z = parseInt(slider.value);
+            drawIsoProfitLine(Z);
+            
+            profitDisplay.textContent = `$${Z.toLocaleString()}`;
+            currentProfitDisplay.textContent = `$${Z.toLocaleString()}`;
+            
+            checkFeasibility(Z);
+        }
+
+        slider.addEventListener('input', draw);
+        draw();
+    </script>
+</body>
+</html>
